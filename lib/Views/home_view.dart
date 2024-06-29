@@ -146,6 +146,7 @@ class _HomeViewState extends State<HomeView> {
     _updateMapStyle();
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         centerTitle: false,
         title: const Text('EcoRuta'),
@@ -160,97 +161,95 @@ class _HomeViewState extends State<HomeView> {
             bottom: Radius.circular(30),
           ),
         ),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: _isDarkMode ? Colors.white : Theme.of(context).appBarTheme.iconTheme?.color,
       ),
-      body: Container(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        child: Stack(
-          children: [
-            GoogleMap(
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-              zoomControlsEnabled: false,
-              initialCameraPosition: _initialCameraPosition,
-              onMapCreated: (controller) {
-                _googleMapController = controller;
-                _updateMapStyle();
-              },
-              polylines: _createPolylines(),
-            ),
-            Column(
-              children: [
-                Expanded(child: Container()), // Space for the map
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black38,
-                        blurRadius: 10,
-                        offset: Offset(0, -1),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                    child: BottomNavigationBar(
-                      items: const <BottomNavigationBarItem>[
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.directions_bus),
-                          label: 'MinuBus',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.directions_transit),
-                          label: 'PumaKatari',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.cable),
-                          label: 'Teleferico',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.local_taxi),
-                          label: 'Taxis',
-                        ),
-                      ],
-                      currentIndex: _selectedIndex,
-                      selectedItemColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
-                      unselectedItemColor: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
-                      onTap: _onItemTapped,
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                    ),
-                  ),
+      body: Stack(
+        children: [
+          GoogleMap(
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            zoomControlsEnabled: false,
+            initialCameraPosition: _initialCameraPosition,
+            onMapCreated: (controller) {
+              _googleMapController = controller;
+              _updateMapStyle();
+            },
+            polylines: _createPolylines(),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: _isDarkMode ? Colors.black : Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
                 ),
-              ],
-            ),
-            Positioned(
-              bottom: 80,
-              right: 20,
-              child: FloatingActionButton(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.black,
-                onPressed: () {
-                  _googleMapController.animateCamera(
-                    CameraUpdate.newCameraPosition(
-                      CameraPosition(
-                        target: _currentPosition,
-                        zoom: 14.5,
-                      ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black38,
+                    blurRadius: 10,
+                    offset: Offset(0, -1),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+                child: BottomNavigationBar(
+                  items: const <BottomNavigationBarItem>[
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.directions_bus),
+                      label: 'MinuBus',
                     ),
-                  );
-                },
-                child: const Icon(Icons.center_focus_strong),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.directions_transit),
+                      label: 'PumaKatari',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.cable),
+                      label: 'Teleferico',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.local_taxi),
+                      label: 'Taxis',
+                    ),
+                  ],
+                  currentIndex: _selectedIndex,
+                  selectedItemColor: _isDarkMode ? Colors.blue : Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+                  unselectedItemColor: _isDarkMode ? Colors.black : Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
+                  onTap: _onItemTapped,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            bottom: 80,
+            right: 20,
+            child: FloatingActionButton(
+              backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+              onPressed: () {
+                _googleMapController.animateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(
+                      target: _currentPosition,
+                      zoom: 14.5,
+                    ),
+                  ),
+                );
+              },
+              child: const Icon(Icons.center_focus_strong),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -46,12 +46,12 @@ final darkTheme = ThemeData(
   primarySwatch: Colors.blue,
   primaryColor: Colors.blueGrey[900],
   appBarTheme: AppBarTheme(
-    color: Colors.blueGrey[900],
+    color: Colors.black,
     iconTheme: IconThemeData(color: Colors.white),
   ),
   bottomNavigationBarTheme: BottomNavigationBarThemeData(
-    backgroundColor: Colors.blueGrey[900],
-    selectedItemColor: Colors.blue,
+    backgroundColor: Colors.black,
+    selectedItemColor: Colors.white,
     unselectedItemColor: Colors.white60,
   ),
   inputDecorationTheme: InputDecorationTheme(
