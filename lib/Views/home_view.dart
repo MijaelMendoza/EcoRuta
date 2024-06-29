@@ -14,9 +14,11 @@ class HomeView extends StatefulWidget {
 
   HomeView({required this.toggleTheme, required this.isDarkMode});
 
-  static Route route({required VoidCallback toggleTheme, required bool isDarkMode}) {
+  static Route route(
+      {required VoidCallback toggleTheme, required bool isDarkMode}) {
     return MaterialPageRoute<void>(
-        builder: (_) => HomeView(toggleTheme: toggleTheme, isDarkMode: isDarkMode));
+        builder: (_) =>
+            HomeView(toggleTheme: toggleTheme, isDarkMode: isDarkMode));
   }
 
   @override
@@ -164,8 +166,12 @@ class _HomeViewState extends State<HomeView> {
             bottom: Radius.circular(30),
           ),
         ),
-        backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).appBarTheme.backgroundColor,
-        foregroundColor: _isDarkMode ? Colors.white : Theme.of(context).appBarTheme.iconTheme?.color,
+        backgroundColor: _isDarkMode
+            ? Colors.black
+            : Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: _isDarkMode
+            ? Colors.white
+            : Theme.of(context).appBarTheme.iconTheme?.color,
       ),
       drawer: Drawer(
         child: ListView(
@@ -215,6 +221,16 @@ class _HomeViewState extends State<HomeView> {
               },
             ),
             ListTile(
+              leading: Icon(Icons.directions_bus),
+              title: Text('Agregar Líneas de Teleferico'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => RegistroLineaScreen()),
+                ); // Navigate to LineasScreen
+              },
+            ),
+            ListTile(
               leading: Icon(Icons.login),
               title: Text('Login'),
               onTap: () {
@@ -246,7 +262,11 @@ class _HomeViewState extends State<HomeView> {
             right: 0,
             child: Container(
               decoration: BoxDecoration(
-                color: _isDarkMode ? Colors.black : Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+                color: _isDarkMode
+                    ? Colors.black
+                    : Theme.of(context)
+                        .bottomNavigationBarTheme
+                        .backgroundColor,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(30),
                   topRight: Radius.circular(30),
@@ -284,8 +304,16 @@ class _HomeViewState extends State<HomeView> {
                     ),
                   ],
                   currentIndex: _selectedIndex,
-                  selectedItemColor: _isDarkMode ? Colors.blue : Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
-                  unselectedItemColor: _isDarkMode ? Colors.black : Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
+                  selectedItemColor: _isDarkMode
+                      ? Colors.blue
+                      : Theme.of(context)
+                          .bottomNavigationBarTheme
+                          .selectedItemColor,
+                  unselectedItemColor: _isDarkMode
+                      ? Colors.black
+                      : Theme.of(context)
+                          .bottomNavigationBarTheme
+                          .unselectedItemColor,
                   onTap: _onItemTapped,
                   backgroundColor: Colors.transparent,
                   elevation: 0,
@@ -299,7 +327,9 @@ class _HomeViewState extends State<HomeView> {
             child: Column(
               children: [
                 FloatingActionButton(
-                  backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).primaryColor,
+                  backgroundColor: _isDarkMode
+                      ? Colors.black
+                      : Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
                   onPressed: () {
                     _googleMapController.animateCamera(
@@ -312,18 +342,6 @@ class _HomeViewState extends State<HomeView> {
                     );
                   },
                   child: const Icon(Icons.center_focus_strong),
-                ),
-                SizedBox(height: 10),
-                FloatingActionButton(
-                  backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => RegistroLineaScreen()),
-                    );
-                  },
-                  child: const Icon(Icons.add),
                 ),
               ],
             ),
@@ -344,4 +362,3 @@ class _HomeViewState extends State<HomeView> {
     return polylines;
   }
 }
-
