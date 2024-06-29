@@ -1,6 +1,11 @@
-// theme.dart
-
 import 'package:flutter/material.dart';
+
+class Pallete {
+  static const Color blueColor = Color(0xFF1E88E5);
+  static const Color greyColor = Color(0xFFBDBDBD);
+  static const Color whiteColor = Color(0xFFFFFFFF);
+  static const Color backgroundColor = Color(0xFF212121);
+}
 
 final lightTheme = ThemeData(
   primarySwatch: Colors.blue,
@@ -14,6 +19,25 @@ final lightTheme = ThemeData(
     backgroundColor: Colors.lightBlue[200],
     selectedItemColor: Colors.blue,
     unselectedItemColor: Colors.black54,
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(5),
+      borderSide: BorderSide(
+        color: Pallete.blueColor,
+        width: 3,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(5),
+      borderSide: BorderSide(
+        color: Pallete.greyColor,
+      ),
+    ),
+    contentPadding: const EdgeInsets.all(22),
+    hintStyle: const TextStyle(
+      fontSize: 18,
+    ),
   ),
 );
 
@@ -29,6 +53,25 @@ final darkTheme = ThemeData(
     backgroundColor: Colors.blueGrey[900],
     selectedItemColor: Colors.blue,
     unselectedItemColor: Colors.white60,
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(5),
+      borderSide: BorderSide(
+        color: Pallete.blueColor,
+        width: 3,
+      ),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(5),
+      borderSide: BorderSide(
+        color: Pallete.greyColor,
+      ),
+    ),
+    contentPadding: const EdgeInsets.all(22),
+    hintStyle: const TextStyle(
+      fontSize: 18,
+    ),
   ),
 );
 
