@@ -1,125 +1,274 @@
+import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gmaps/firebase_options.dart';
+import 'package:flutter_gmaps/utils/theme.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
+class MyApp extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
+  _MyAppState createState() => _MyAppState();
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.light;
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
+  void _toggleTheme() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    return MaterialApp(
+      title: 'Flutter Google Maps',
+      debugShowCheckedModeBanner: false,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: _themeMode,
+      home: MapScreen(toggleTheme: _toggleTheme, isDarkMode: _themeMode == ThemeMode.dark),
+    );
+  }
+}
+
+class MapScreen extends StatefulWidget {
+  final VoidCallback toggleTheme;
+  final bool isDarkMode;
+
+  MapScreen({required this.toggleTheme, required this.isDarkMode});
+
+  @override
+  _MapScreenState createState() => _MapScreenState();
+}
+
+class _MapScreenState extends State<MapScreen> {
+  static const _initialCameraPosition = CameraPosition(
+    target: LatLng(-16.4897, -68.1193),
+    zoom: 14.5,
+  );
+
+  late GoogleMapController _googleMapController;
+  late LatLng _currentPosition;
+  StreamSubscription<Position>? _positionStream;
+  List<LatLng> _traveledPoints = [];
+  int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestLocationPermission();
+    _getCurrentLocation();
+    _listenToLocationChanges();
+  }
+
+  @override
+  void dispose() {
+    _googleMapController.dispose();
+    _positionStream?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      return Future.error('Location services are disabled.');
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return Future.error('Location permissions are denied');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error(
+          'Location permissions are permanently denied, we cannot request permissions.');
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    final position = await Geolocator.getCurrentPosition();
+    setState(() {
+      _currentPosition = LatLng(position.latitude, position.longitude);
+      _traveledPoints.add(_currentPosition);
+    });
+
+    _googleMapController.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: _currentPosition,
+          zoom: 14.5,
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+
+  void _listenToLocationChanges() {
+    _positionStream = Geolocator.getPositionStream().listen((position) {
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+        _traveledPoints.add(_currentPosition);
+      });
+
+      _googleMapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _currentPosition,
+            zoom: 14.5,
+          ),
+        ),
+      );
+    });
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  void _updateMapStyle() async {
+    if (widget.isDarkMode) {
+      _googleMapController.setMapStyle(darkMapStyle);
+    } else {
+      _googleMapController.setMapStyle(null); // Default style
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _updateMapStyle();
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          GoogleMap(
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            zoomControlsEnabled: false,
+            initialCameraPosition: _initialCameraPosition,
+            onMapCreated: (controller) {
+              _googleMapController = controller;
+              _updateMapStyle();
+            },
+            polylines: _createPolylines(),
+          ),
+          Column(
+            children: [
+              AppBar(
+                centerTitle: false,
+                title: const Text('Nombre'),
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.brightness_6),
+                    onPressed: widget.toggleTheme,
+                  ),
+                ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(30),
+                  ),
+                ),
+                backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+              ),
+              Expanded(child: Container()), // Space for the map
+              Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black38,
+                      blurRadius: 10,
+                      offset: Offset(0, -1),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                  child: BottomNavigationBar(
+                    items: const <BottomNavigationBarItem>[
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.directions_bus),
+                        label: 'MinuBus',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.directions_transit),
+                        label: 'PumaKatari',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.cable),
+                        label: 'Teleferico',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.local_taxi),
+                        label: 'Taxis',
+                      ),
+                    ],
+                    currentIndex: _selectedIndex,
+                    selectedItemColor: Theme.of(context).bottomNavigationBarTheme.selectedItemColor,
+                    unselectedItemColor: Theme.of(context).bottomNavigationBarTheme.unselectedItemColor,
+                    onTap: _onItemTapped,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 80,
+            right: 20,
+            child: FloatingActionButton(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.black,
+              onPressed: () {
+                _googleMapController.animateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(
+                      target: _currentPosition,
+                      zoom: 14.5,
+                    ),
+                  ),
+                );
+              },
+              child: const Icon(Icons.center_focus_strong),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Set<Polyline> _createPolylines() {
+    Set<Polyline> polylines = {};
+    polylines.add(Polyline(
+      polylineId: const PolylineId('traveled_route'),
+      color: Colors.grey,
+      width: 5,
+      points: _traveledPoints,
+    ));
+    return polylines;
   }
 }
