@@ -172,7 +172,7 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               AppBar(
                 centerTitle: false,
-                title: const Text('Nombre'),
+                title: const Text('EcoRuta'),
                 actions: [
                   IconButton(
                     icon: Icon(Icons.brightness_6),
