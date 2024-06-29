@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_gmaps/Views/MiTeleferico/Registro/RegistroLineaScreen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_gmaps/utils/theme.dart';
@@ -233,20 +234,36 @@ class _HomeViewState extends State<HomeView> {
           Positioned(
             bottom: 80,
             right: 20,
-            child: FloatingActionButton(
-              backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-              onPressed: () {
-                _googleMapController.animateCamera(
-                  CameraUpdate.newCameraPosition(
-                    CameraPosition(
-                      target: _currentPosition,
-                      zoom: 14.5,
-                    ),
-                  ),
-                );
-              },
-              child: const Icon(Icons.center_focus_strong),
+            child: Column(
+              children: [
+                FloatingActionButton(
+                  backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  onPressed: () {
+                    _googleMapController.animateCamera(
+                      CameraUpdate.newCameraPosition(
+                        CameraPosition(
+                          target: _currentPosition,
+                          zoom: 14.5,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.center_focus_strong),
+                ),
+                SizedBox(height: 10),
+                FloatingActionButton(
+                  backgroundColor: _isDarkMode ? Colors.black : Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => RegistroLineaScreen()),
+                    );
+                  },
+                  child: const Icon(Icons.add),
+                ),
+              ],
             ),
           ),
         ],

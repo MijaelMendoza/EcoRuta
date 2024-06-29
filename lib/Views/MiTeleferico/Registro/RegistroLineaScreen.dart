@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/Controllers/MiTeleferico/LineasTelefericoController.dart';
+import 'package:flutter_gmaps/constants/constants.dart';
 import 'package:flutter_gmaps/models/MiTeleferico/LineaTeleferico.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -108,8 +109,7 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
   }
 
   Future<String> _getGooglePlaceName(LatLng pos) async {
-    final apiKey = 'TU_API_KEY'; // Reemplaza con tu API Key de Google Maps
-    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.latitude},${pos.longitude}&key=$apiKey';
+    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.latitude},${pos.longitude}&key=$googleAPIKey';
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       final jsonResponse = json.decode(response.body);
@@ -304,10 +304,10 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
   }
 
   Future<BitmapDescriptor> _createCustomMarkerBitmap(Color color) async {
-    final svgString = await rootBundle.loadString('assets/TelefericoIcon.svg');
+    final svgString = await rootBundle.loadString('assets/svgs/TelefericoIcon.svg');
     final PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
-    const double size = 200.0;
+    const double size = 130.0;
 
     final Paint paint = Paint()
       ..color = color
