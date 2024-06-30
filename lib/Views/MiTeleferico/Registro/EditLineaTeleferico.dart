@@ -4,33 +4,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_gmaps/.env.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_gmaps/Controllers/MiTeleferico/LineasTelefericoController.dart';
 import 'package:flutter_gmaps/models/MiTeleferico/LineaTeleferico.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart'; // Añadir esta importación para generar IDs únicos
 
-class RegistroLineaScreen extends StatefulWidget {
+class EditarLineaScreen extends StatefulWidget {
+  final LineaTeleferico linea;
+
+  EditarLineaScreen({required this.linea});
+
   @override
-  _RegistroLineaScreenState createState() => _RegistroLineaScreenState();
+  _EditarLineaScreenState createState() => _EditarLineaScreenState();
 }
 
-class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
+class _EditarLineaScreenState extends State<EditarLineaScreen> {
   final List<Marker> _newMarkers = [];
   final List<LatLng> _stations = [];
   final List<String> _stationNames = [];
   final List<String> _locationNames = [];
   final List<Polyline> _newPolylines = [];
   GoogleMapController? _mapController;
-  String _selectedColorName = '';
   Color _selectedColor = Colors.black;
   bool _colorSelected = false;
   TextEditingController _lineNameController = TextEditingController();
   final LineaTelefericoController _firebaseController = LineaTelefericoController();
-  List<LineaTeleferico> _lineasTeleferico = [];
+  int _startIndex = -1; // Indice de la estación de inicio para editar conexiones
+  bool _editConnectionsMode = false; // Modo para editar conexiones
 
   static const CameraPosition _initialCameraPosition = CameraPosition(
     target: LatLng(-16.488997, -68.1248959),
@@ -40,71 +42,60 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLineasTeleferico();
+    _lineNameController.text = widget.linea.nombre;
+    _selectedColor = Color(int.parse('0xff${widget.linea.colorValue.substring(1)}'));
+    _colorSelected = true;
+    _stations.addAll(widget.linea.estaciones.map((e) => LatLng(e.latitud, e.longitud)));
+    _stationNames.addAll(widget.linea.estaciones.map((e) => e.nombreEstacion));
+    _locationNames.addAll(widget.linea.estaciones.map((e) => e.nombreUbicacion));
+    _loadMarkers();
+    _updatePolylines();
   }
 
-  Future<void> _loadLineasTeleferico() async {
-    _firebaseController.getLineasTelefericos().listen((lineas) {
+  Future<void> _loadMarkers() async {
+    for (var estacion in widget.linea.estaciones) {
+      final markerIcon = await _createCustomMarkerBitmap(_selectedColor);
+      final marker = Marker(
+        markerId: MarkerId(estacion.nombreEstacion),
+        position: LatLng(estacion.latitud, estacion.longitud),
+        infoWindow: InfoWindow(
+          title: estacion.nombreEstacion,
+          snippet: estacion.nombreUbicacion,
+        ),
+        icon: markerIcon,
+        onTap: () {
+          if (_editConnectionsMode) {
+            _setEndIndexForConnection(_stations.indexOf(LatLng(estacion.latitud, estacion.longitud)));
+          } else {
+            _editStation(
+              LatLng(estacion.latitud, estacion.longitud),
+              estacion.nombreEstacion,
+              estacion.nombreUbicacion,
+            );
+          }
+        },
+        draggable: true,
+        onDragEnd: (newPosition) {
+          _updateStationPosition(estacion.nombreEstacion, newPosition);
+        },
+      );
+      _newMarkers.add(marker);
+    }
+    setState(() {});
+  }
+
+  void _updateStationPosition(String stationName, LatLng newPosition) {
+    final index = _stations.indexWhere((pos) => _stationNames[_stations.indexOf(pos)] == stationName);
+    if (index != -1) {
       setState(() {
-        _lineasTeleferico = lineas;
-        _loadMarkersAndPolylines();
+        _stations[index] = newPosition;
+        _updatePolylines();
       });
-    });
+    }
   }
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    _loadMarkersAndPolylines();
-  }
-
-  Future<void> _loadMarkersAndPolylines() async {
-    _newMarkers.clear();
-    _newPolylines.clear();
-
-    for (var linea in _lineasTeleferico) {
-      for (var estacion in linea.estaciones) {
-        final markerIcon = await _createCustomMarkerBitmap(Color(int.parse('0xff${linea.colorValue.substring(1)}')));
-
-        final marker = Marker(
-          markerId: MarkerId(estacion.nombreEstacion),
-          position: LatLng(estacion.latitud, estacion.longitud),
-          infoWindow: InfoWindow(
-            title: estacion.nombreEstacion,
-            snippet: estacion.nombreUbicacion,
-          ),
-          icon: markerIcon,
-        );
-        _newMarkers.add(marker);
-      }
-
-      if (linea.estaciones.length > 1) {
-        for (int i = 0; i < linea.estaciones.length - 1; i++) {
-          final color = Color(int.parse('0xff${linea.colorValue.substring(1)}'));
-
-          _newPolylines.add(Polyline(
-            polylineId: PolylineId('border_polyline_${linea.nombre}_$i'),
-            color: Colors.black,
-            width: 9,
-            points: [
-              LatLng(linea.estaciones[i].latitud, linea.estaciones[i].longitud),
-              LatLng(linea.estaciones[i + 1].latitud, linea.estaciones[i + 1].longitud),
-            ],
-          ));
-
-          _newPolylines.add(Polyline(
-            polylineId: PolylineId('polyline_${linea.nombre}_$i'),
-            color: color,
-            width: 5,
-            points: [
-              LatLng(linea.estaciones[i].latitud, linea.estaciones[i].longitud),
-              LatLng(linea.estaciones[i + 1].latitud, linea.estaciones[i + 1].longitud),
-            ],
-          ));
-        }
-      }
-    }
-
-    setState(() {});
   }
 
   Future<String> _getGooglePlaceName(LatLng pos) async {
@@ -177,7 +168,11 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
                       infoWindow: InfoWindow(title: stationName, snippet: locationName),
                       icon: markerIcon,
                       onTap: () {
-                        _editStation(pos, stationName, locationName);
+                        if (_editConnectionsMode) {
+                          _setEndIndexForConnection(_stations.indexOf(pos));
+                        } else {
+                          _editStation(pos, stationName, locationName);
+                        }
                       },
                     );
                     _newMarkers.add(marker);
@@ -251,7 +246,11 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
                       ),
                       icon: _newMarkers[index].icon,
                       onTap: () {
-                        _editStation(pos, stationNameController.text, locationNameController.text);
+                        if (_editConnectionsMode) {
+                          _setEndIndexForConnection(index);
+                        } else {
+                          _editStation(pos, stationNameController.text, locationNameController.text);
+                        }
                       },
                     );
 
@@ -310,16 +309,16 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
     svgDrawableRoot.clipCanvasToViewBox(canvas);
     svgDrawableRoot.draw(canvas, Rect.fromLTWH(0, 0, size, size));
 
-    final picture = pictureRecorder.endRecording();
-    final img = await picture.toImage(size.toInt(), size.toInt());
-    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    final uint8List = byteData!.buffer.asUint8List();
+    final ui.Picture picture = pictureRecorder.endRecording();
+    final ui.Image img = await picture.toImage(size.toInt(), size.toInt());
+    final ByteData? byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    final Uint8List uint8List = byteData!.buffer.asUint8List();
 
     return BitmapDescriptor.fromBytes(uint8List);
   }
 
   void _saveLinea() async {
-    if (_selectedColorName.isNotEmpty && _stations.isNotEmpty) {
+    if (_lineNameController.text.isNotEmpty && _stations.isNotEmpty) {
       final estaciones = _stations.asMap().entries.map((entry) {
         final index = entry.key;
         final LatLng pos = entry.value;
@@ -333,17 +332,15 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
         );
       }).toList();
 
-      final String id = Uuid().v4(); // Generar un ID único para la nueva línea
-
       final linea = LineaTeleferico(
-        id: id,
-        nombre: _selectedColorName,
-        color: _selectedColorName,
+        id: widget.linea.id,
+        nombre: _lineNameController.text,
+        color: _lineNameController.text,
         colorValue: '#${_selectedColor.value.toRadixString(16).substring(2)}',
         estaciones: estaciones,
       );
 
-      await _firebaseController.saveLineaTeleferico(linea);
+      await _firebaseController.updateLineaTeleferico(linea.id, linea); // Pasar el id y el objeto linea
 
       setState(() {
         _newMarkers.clear();
@@ -353,9 +350,10 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
         _locationNames.clear();
         _lineNameController.clear();
         _colorSelected = false;
+        _editConnectionsMode = false; // Desactivar el modo de edición de conexiones al guardar
       });
 
-      _loadLineasTeleferico(); // Reload the list of lines
+      Navigator.of(context).pop();
     }
   }
 
@@ -394,7 +392,6 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
                     onPressed: () {
                       if (_lineNameController.text.isNotEmpty) {
                         setState(() {
-                          _selectedColorName = _lineNameController.text;
                           _colorSelected = true;
                         });
                         Navigator.of(context).pop();
@@ -438,15 +435,49 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
     }
   }
 
+  void _setStartIndexForConnection(int index) {
+    setState(() {
+      _startIndex = index;
+    });
+  }
+
+  void _setEndIndexForConnection(int endIndex) {
+    if (_startIndex != -1 && endIndex != _startIndex) {
+      setState(() {
+        final startStation = _stations[_startIndex];
+        final endStation = _stations[endIndex];
+
+        _newPolylines.add(Polyline(
+          polylineId: PolylineId('custom_polyline_${_startIndex}_$endIndex'),
+          color: _selectedColor,
+          width: 5,
+          points: [startStation, endStation],
+        ));
+        _startIndex = -1; // Reset start index after setting the connection
+      });
+    }
+  }
+
+  void _toggleEditConnectionsMode() {
+    setState(() {
+      _editConnectionsMode = !_editConnectionsMode;
+      _startIndex = -1; // Reset start index if mode is toggled
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Registrar Línea de Teleférico'),
+        title: Text('Editar Línea de Teleférico'),
         actions: [
           IconButton(
             icon: Icon(Icons.save),
             onPressed: _saveLinea,
+          ),
+          IconButton(
+            icon: Icon(_editConnectionsMode ? Icons.close : Icons.link),
+            onPressed: _toggleEditConnectionsMode,
           ),
         ],
       ),
@@ -483,7 +514,6 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
               onPressed: () {
                 if (_lineNameController.text.isNotEmpty) {
                   setState(() {
-                    _selectedColorName = _lineNameController.text;
                     _colorSelected = true;
                   });
                 }
@@ -497,12 +527,25 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
   }
 
   Widget _buildMapScreen() {
-    return GoogleMap(
-      initialCameraPosition: _initialCameraPosition,
-      onMapCreated: _onMapCreated,
-      markers: Set.from(_newMarkers),
-      polylines: Set.from(_newPolylines),
-      onTap: _addStation,
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: _initialCameraPosition,
+          onMapCreated: _onMapCreated,
+          markers: Set.from(_newMarkers),
+          polylines: Set.from(_newPolylines),
+          onTap: _addStation,
+        ),
+        if (_editConnectionsMode)
+          Positioned(
+            bottom: 20,
+            left: 20,
+            child: ElevatedButton(
+              onPressed: _toggleEditConnectionsMode,
+              child: Text('Salir del Modo de Edición de Conexiones'),
+            ),
+          ),
+      ],
     );
   }
 }

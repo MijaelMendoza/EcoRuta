@@ -44,6 +44,7 @@ class LineaTelefericoController {
             .toList();
 
         return LineaTeleferico(
+          id: doc.id,
           nombre: data['nombre'],
           color: data['color'],
           colorValue: data['colorValue'],

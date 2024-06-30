@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_gmaps/Views/lineas/lineas_registered_view.dart';
-import 'package:flutter_gmaps/auth/view/welcome.dart';
-import 'package:flutter_gmaps/Views/MiTeleferico/Registro/RegistroLineaScreen.dart';
+import 'package:flutter_gmaps/.env.dart';
+import 'package:flutter_gmaps/Views/MiTeleferico/RouteViewTeleferico.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_gmaps/utils/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_gmaps/utils/theme.dart';
+import 'package:flutter_gmaps/utils/menu_drawer.dart';
+import 'package:http/http.dart' as http;
+import 'package:google_place/google_place.dart';
+import 'dart:convert';
 
 class HomeView extends StatefulWidget {
   final VoidCallback toggleTheme;
@@ -33,10 +36,18 @@ class _HomeViewState extends State<HomeView> {
 
   late GoogleMapController _googleMapController;
   late LatLng _currentPosition;
+  LatLng? _originPosition;
+  LatLng? _destinationPosition;
+  String _originAddress = '';
+  String _destinationAddress = '';
   StreamSubscription<Position>? _positionStream;
-  List<LatLng> _traveledPoints = [];
-  int _selectedIndex = 0;
   bool _isDarkMode = false;
+  int _selectedIndex = 0;
+  TextEditingController _originController = TextEditingController();
+  TextEditingController _destinationController = TextEditingController();
+  List<AutocompletePrediction> _originPredictions = [];
+  List<AutocompletePrediction> _destinationPredictions = [];
+  final GooglePlace googlePlace = GooglePlace(googleAPIKey);
 
   @override
   void initState() {
@@ -45,13 +56,14 @@ class _HomeViewState extends State<HomeView> {
     _loadThemePreference();
     _requestLocationPermission();
     _getCurrentLocation();
-    _listenToLocationChanges();
   }
 
   @override
   void dispose() {
     _googleMapController.dispose();
     _positionStream?.cancel();
+    _originController.dispose();
+    _destinationController.dispose();
     super.dispose();
   }
 
@@ -88,9 +100,12 @@ class _HomeViewState extends State<HomeView> {
 
   Future<void> _getCurrentLocation() async {
     final position = await Geolocator.getCurrentPosition();
+    _currentPosition = LatLng(position.latitude, position.longitude);
+    _originPosition = _currentPosition;
+    final address = await _getAddressFromLatLng(_currentPosition);
     setState(() {
-      _currentPosition = LatLng(position.latitude, position.longitude);
-      _traveledPoints.add(_currentPosition);
+      _originAddress = address;
+      _originController.text = _originAddress;
     });
 
     _googleMapController.animateCamera(
@@ -103,22 +118,16 @@ class _HomeViewState extends State<HomeView> {
     );
   }
 
-  void _listenToLocationChanges() {
-    _positionStream = Geolocator.getPositionStream().listen((position) {
-      setState(() {
-        _currentPosition = LatLng(position.latitude, position.longitude);
-        _traveledPoints.add(_currentPosition);
-      });
-
-      _googleMapController.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: _currentPosition,
-            zoom: 14.5,
-          ),
-        ),
-      );
-    });
+  Future<String> _getAddressFromLatLng(LatLng position) async {
+    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$googleAPIKey';
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final jsonResponse = json.decode(response.body);
+      if (jsonResponse['results'] != null && jsonResponse['results'].length > 0) {
+        return jsonResponse['results'][0]['formatted_address'];
+      }
+    }
+    return '';
   }
 
   void _onItemTapped(int index) {
@@ -146,6 +155,301 @@ class _HomeViewState extends State<HomeView> {
     });
   }
 
+  void _showOriginDestinationBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      child: BottomNavigationBar(
+                        items: const <BottomNavigationBarItem>[
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.directions_bus),
+                            label: 'MinuBus',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.directions_transit),
+                            label: 'PumaKatari',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.cable),
+                            label: 'Teleferico',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.local_taxi),
+                            label: 'Taxis',
+                          ),
+                        ],
+                        currentIndex: _selectedIndex,
+                        selectedItemColor: _isDarkMode
+                            ? Colors.blue
+                            : Theme.of(context)
+                                .bottomNavigationBarTheme
+                                .selectedItemColor,
+                        unselectedItemColor: _isDarkMode
+                            ? Colors.black
+                            : Theme.of(context)
+                                .bottomNavigationBarTheme
+                                .unselectedItemColor,
+                        onTap: (index) {
+                          setState(() {
+                            _selectedIndex = index;
+                          });
+                        },
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    TextField(
+                                      controller: _originController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Origen',
+                                        hintText: 'Selecciona el origen',
+                                        prefixIcon: Icon(Icons.location_on),
+                                      ),
+                                      onChanged: (value) async {
+                                        if (value.isNotEmpty) {
+                                          var result = await googlePlace.autocomplete.get(value);
+                                          if (result != null && result.predictions != null) {
+                                            setState(() {
+                                              _originPredictions = result.predictions!;
+                                            });
+                                          }
+                                        } else {
+                                          setState(() {
+                                            _originPredictions = [];
+                                          });
+                                        }
+                                      },
+                                    ),
+                                    _originPredictions.isNotEmpty
+                                        ? Container(
+                                            height: 100,
+                                            child: ListView.builder(
+                                              itemCount: _originPredictions.length,
+                                              itemBuilder: (context, index) {
+                                                return ListTile(
+                                                  title: Text(_originPredictions[index].description ?? ''),
+                                                  onTap: () async {
+                                                    final placeId = _originPredictions[index].placeId!;
+                                                    final details = await googlePlace.details.get(placeId);
+                                                    if (details != null && details.result != null) {
+                                                      final location = details.result!.geometry!.location!;
+                                                      setState(() {
+                                                        _originPosition = LatLng(location.lat!, location.lng!);
+                                                        _originAddress = details.result!.formattedAddress!;
+                                                        _originController.text = _originAddress;
+                                                        _originPredictions = [];
+                                                      });
+                                                    }
+                                                  },
+                                                );
+                                              },
+                                            ),
+                                          )
+                                        : Container(),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.edit_location),
+                                onPressed: () async {
+                                  LatLng? result = await _selectLocationOnMap();
+                                  if (result != null) {
+                                    final address = await _getAddressFromLatLng(result);
+                                    setState(() {
+                                      _originPosition = result;
+                                      _originAddress = address;
+                                      _originController.text = _originAddress;
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    TextField(
+                                      controller: _destinationController,
+                                      decoration: InputDecoration(
+                                        labelText: 'Destino',
+                                        hintText: 'Selecciona el destino',
+                                        prefixIcon: Icon(Icons.flag),
+                                      ),
+                                      onChanged: (value) async {
+                                        if (value.isNotEmpty) {
+                                          var result = await googlePlace.autocomplete.get(value);
+                                          if (result != null && result.predictions != null) {
+                                            setState(() {
+                                              _destinationPredictions = result.predictions!;
+                                            });
+                                          }
+                                        } else {
+                                          setState(() {
+                                            _destinationPredictions = [];
+                                          });
+                                        }
+                                      },
+                                    ),
+                                    _destinationPredictions.isNotEmpty
+                                        ? Container(
+                                            height: 100,
+                                            child: ListView.builder(
+                                              itemCount: _destinationPredictions.length,
+                                              itemBuilder: (context, index) {
+                                                return ListTile(
+                                                  title: Text(_destinationPredictions[index].description ?? ''),
+                                                  onTap: () async {
+                                                    final placeId = _destinationPredictions[index].placeId!;
+                                                    final details = await googlePlace.details.get(placeId);
+                                                    if (details != null && details.result != null) {
+                                                      final location = details.result!.geometry!.location!;
+                                                      setState(() {
+                                                        _destinationPosition = LatLng(location.lat!, location.lng!);
+                                                        _destinationAddress = details.result!.formattedAddress!;
+                                                        _destinationController.text = _destinationAddress;
+                                                        _destinationPredictions = [];
+                                                      });
+                                                    }
+                                                  },
+                                                );
+                                              },
+                                            ),
+                                          )
+                                        : Container(),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.edit_location),
+                                onPressed: () async {
+                                  LatLng? result = await _selectLocationOnMap();
+                                  if (result != null) {
+                                    final address = await _getAddressFromLatLng(result);
+                                    setState(() {
+                                      _destinationPosition = result;
+                                      _destinationAddress = address;
+                                      _destinationController.text = _destinationAddress;
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              if (_selectedIndex == 2) { // Teleferico
+                                _irARouteView();
+                              }
+                            },
+                            child: Text('Buscar Ruta'),
+                          ),
+                          SizedBox(height: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: Text('Cerrar'),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<LatLng?> _selectLocationOnMap() async {
+    LatLng? selectedLocation;
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Scaffold(
+              appBar: AppBar(
+                title: Text('Selecciona la ubicación'),
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.check),
+                    onPressed: () {
+                      Navigator.of(context).pop(selectedLocation);
+                    },
+                  ),
+                ],
+              ),
+              body: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: _currentPosition,
+                  zoom: 14.5,
+                ),
+                onTap: (LatLng position) {
+                  setState(() {
+                    selectedLocation = position;
+                  });
+                },
+                markers: selectedLocation != null
+                    ? {
+                        Marker(
+                          markerId: MarkerId('selected_location'),
+                          position: selectedLocation!,
+                        ),
+                      }
+                    : {},
+              ),
+            );
+          },
+        );
+      },
+    );
+    return selectedLocation;
+  }
+
+  void _irARouteView() {
+    if (_originPosition != null && _destinationPosition != null) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => RouteViewTeleferico(
+          originPosition: _originPosition!,
+          destinationPosition: _destinationPosition!,
+        ),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     _updateMapStyle();
@@ -157,10 +461,24 @@ class _HomeViewState extends State<HomeView> {
         title: const Text('EcoRuta'),
         actions: [
           IconButton(
-            icon: Icon(Icons.brightness_6),
+            icon: Icon(
+              Icons.brightness_6,
+              color: _isDarkMode ? Colors.white : Colors.black,
+            ),
             onPressed: _toggleTheme,
           ),
         ],
+        leading: Builder(
+          builder: (context) {
+            return IconButton(
+              icon: Icon(
+                Icons.menu,
+                color: _isDarkMode ? Colors.white : Colors.black,
+              ),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            );
+          },
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             bottom: Radius.circular(30),
@@ -173,76 +491,7 @@ class _HomeViewState extends State<HomeView> {
             ? Colors.white
             : Theme.of(context).appBarTheme.iconTheme?.color,
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-              ),
-              child: Text(
-                'Menu',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: Icon(Icons.map),
-              title: Text('Mapa'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Configuración'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.info),
-              title: Text('Acerca de'),
-              onTap: () {
-                Navigator.pop(context); // Close the drawer
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.directions_bus),
-              title: Text('Agregar Líneas de Bus'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => LineasScreen()),
-                ); // Navigate to LineasScreen
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.directions_bus),
-              title: Text('Agregar Líneas de Teleferico'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => RegistroLineaScreen()),
-                ); // Navigate to LineasScreen
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.login),
-              title: Text('Login'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => WelcomePage()),
-                ); // Navigate to WelcomePage
-              },
-            ),
-          ],
-        ),
-      ),
+      drawer: MenuDrawer(),
       body: Stack(
         children: [
           GoogleMap(
@@ -254,111 +503,82 @@ class _HomeViewState extends State<HomeView> {
               _googleMapController = controller;
               _updateMapStyle();
             },
-            polylines: _createPolylines(),
           ),
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: _isDarkMode
-                    ? Colors.black
-                    : Theme.of(context)
-                        .bottomNavigationBarTheme
-                        .backgroundColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black38,
-                    blurRadius: 10,
-                    offset: Offset(0, -1),
+            child: GestureDetector(
+              onTap: _showOriginDestinationBottomSheet,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _isDarkMode
+                      ? Colors.black
+                      : Theme.of(context)
+                          .bottomNavigationBarTheme
+                          .backgroundColor,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-                child: BottomNavigationBar(
-                  items: const <BottomNavigationBarItem>[
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.directions_bus),
-                      label: 'MinuBus',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.directions_transit),
-                      label: 'PumaKatari',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.cable),
-                      label: 'Teleferico',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.local_taxi),
-                      label: 'Taxis',
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black38,
+                      blurRadius: 10,
+                      offset: Offset(0, -1),
                     ),
                   ],
-                  currentIndex: _selectedIndex,
-                  selectedItemColor: _isDarkMode
-                      ? Colors.blue
-                      : Theme.of(context)
-                          .bottomNavigationBarTheme
-                          .selectedItemColor,
-                  unselectedItemColor: _isDarkMode
-                      ? Colors.black
-                      : Theme.of(context)
-                          .bottomNavigationBarTheme
-                          .unselectedItemColor,
-                  onTap: _onItemTapped,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                  child: BottomNavigationBar(
+                    items: const <BottomNavigationBarItem>[
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.directions_bus),
+                        label: 'MinuBus',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.directions_transit),
+                        label: 'PumaKatari',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.cable),
+                        label: 'Teleferico',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.local_taxi),
+                        label: 'Taxis',
+                      ),
+                    ],
+                    currentIndex: _selectedIndex,
+                    selectedItemColor: _isDarkMode
+                        ? Colors.blue
+                        : Theme.of(context)
+                            .bottomNavigationBarTheme
+                            .selectedItemColor,
+                    unselectedItemColor: _isDarkMode
+                        ? Colors.black
+                        : Theme.of(context)
+                            .bottomNavigationBarTheme
+                            .unselectedItemColor,
+                    onTap: (index) {
+                      setState(() {
+                        _selectedIndex = index;
+                      });
+                      _showOriginDestinationBottomSheet();
+                    },
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                  ),
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            bottom: 80,
-            right: 20,
-            child: Column(
-              children: [
-                FloatingActionButton(
-                  backgroundColor: _isDarkMode
-                      ? Colors.black
-                      : Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                  onPressed: () {
-                    _googleMapController.animateCamera(
-                      CameraUpdate.newCameraPosition(
-                        CameraPosition(
-                          target: _currentPosition,
-                          zoom: 14.5,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.center_focus_strong),
-                ),
-              ],
             ),
           ),
         ],
       ),
     );
-  }
-
-  Set<Polyline> _createPolylines() {
-    Set<Polyline> polylines = {};
-    polylines.add(Polyline(
-      polylineId: const PolylineId('traveled_route'),
-      color: Colors.grey,
-      width: 5,
-      points: _traveledPoints,
-    ));
-    return polylines;
   }
 }

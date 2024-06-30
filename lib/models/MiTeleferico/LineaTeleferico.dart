@@ -1,10 +1,12 @@
 class LineaTeleferico {
+  String id;
   String nombre;
   String color;
   String colorValue;
   List<Estacion> estaciones;
 
   LineaTeleferico({
+    required this.id,
     required this.nombre,
     required this.color,
     required this.colorValue,
