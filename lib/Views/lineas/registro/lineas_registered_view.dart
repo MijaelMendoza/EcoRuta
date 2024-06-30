@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/Controllers/MiLinea/lineas_controller.dart';
-import 'package:flutter_gmaps/Views/lineas/add_lineas_view.dart';
+import 'package:flutter_gmaps/Views/lineas/registro/add_lineas_view.dart';
 import 'package:flutter_gmaps/Views/lineas/view_linea_screend.dart';
 import 'package:flutter_gmaps/models/MiLinea/lineas_model.dart';
 

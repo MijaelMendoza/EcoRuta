@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/Views/MiTeleferico/Registro/ListLineasTeleferico.dart';
 import 'package:flutter_gmaps/Views/lineas/lineas_registered_view.dart';
-import 'package:flutter_gmaps/auth/controller/auth_controller.dart';
-import 'package:flutter_gmaps/auth/view/login_view.dart';
 import 'package:flutter_gmaps/auth/view/welcome.dart';
 import 'package:flutter_gmaps/user_profile/view/user_profile_view.dart'; // Importar la vista del perfil del usuario
 import 'package:flutter_riverpod/flutter_riverpod.dart';
