@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/.env.dart';
 import 'package:flutter_gmaps/Views/MiTeleferico/RouteViewTeleferico.dart';
+import 'package:flutter_gmaps/Views/lineas/buspuma/buspuma_view.dart';
+import 'package:flutter_gmaps/Views/lineas/minibus/minibus_view.dart';
+import 'package:flutter_gmaps/Views/taxi/taxi_view.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -366,9 +369,7 @@ class _HomeViewState extends State<HomeView> {
                           ElevatedButton(
                             onPressed: () {
                               Navigator.pop(context);
-                              if (_selectedIndex == 2) { // Teleferico
-                                _irARouteView();
-                              }
+                              _navigateToSelectedTransport();
                             },
                             child: Text('Buscar Ruta'),
                           ),
@@ -439,14 +440,37 @@ class _HomeViewState extends State<HomeView> {
     return selectedLocation;
   }
 
-  void _irARouteView() {
+  void _navigateToSelectedTransport() {
     if (_originPosition != null && _destinationPosition != null) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => RouteViewTeleferico(
-          originPosition: _originPosition!,
-          destinationPosition: _destinationPosition!,
-        ),
-      ));
+      if (_selectedIndex == 0) { // Minibus
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => RouteMinibusScreen(
+            originPosition: _originPosition!,
+            destinationPosition: _destinationPosition!,
+          ),
+        ));
+      } else if (_selectedIndex == 1) { // Pumakatari
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => RoutePumakatariScreen(
+            originPosition: _originPosition!,
+            destinationPosition: _destinationPosition!,
+          ),
+        ));
+      } else if (_selectedIndex == 2) { // Teleferico
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => RouteViewTeleferico(
+            originPosition: _originPosition!,
+            destinationPosition: _destinationPosition!,
+          ),
+        ));
+      } else if (_selectedIndex == 3) { // Taxis
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (context) => RouteTaxiScreen(
+            originPosition: _originPosition!,
+            destinationPosition: _destinationPosition!,
+          ),
+        ));
+      }
     }
   }
 

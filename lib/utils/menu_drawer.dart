@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/Views/MiTeleferico/Registro/ListLineasTeleferico.dart';
-import 'package:flutter_gmaps/Views/lineas/lineas_registered_view.dart';
+import 'package:flutter_gmaps/Views/lineas/registro/lineas_registered_view.dart';
 import 'package:flutter_gmaps/auth/view/welcome.dart';
 
 class MenuDrawer extends StatelessWidget {

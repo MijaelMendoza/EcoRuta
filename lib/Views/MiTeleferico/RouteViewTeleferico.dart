@@ -11,6 +11,7 @@ import 'package:flutter_gmaps/Controllers/MiTeleferico/LineasTelefericoControlle
 import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RouteViewTeleferico extends StatefulWidget {
   final LatLng originPosition;
@@ -30,6 +31,11 @@ class _RouteViewTelefericoState extends State<RouteViewTeleferico> {
   Map<String, List<String>> _grafo = {};
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
+
+  double _price = 0.0;
+  double _co2 = 0.0;
+  double _totalDistance = 0.0;
+  Duration _totalDuration = Duration.zero;
 
   @override
   void initState() {
@@ -138,6 +144,8 @@ class _RouteViewTelefericoState extends State<RouteViewTeleferico> {
 
     if (jsonResponse['status'] == 'OK') {
       final points = jsonResponse['routes'][0]['overview_polyline']['points'];
+      _totalDuration += Duration(seconds: jsonResponse['routes'][0]['legs'][0]['duration']['value']);
+      _totalDistance += jsonResponse['routes'][0]['legs'][0]['distance']['value'] / 1000; // Convert meters to kilometers
       return _decodePolyline(points);
     } else {
       return [];
@@ -271,6 +279,10 @@ class _RouteViewTelefericoState extends State<RouteViewTeleferico> {
   Future<void> _mostrarRutaEnMapa(List<Estacion> ruta, Estacion estacionOrigen, Estacion estacionDestino) async {
     _polylines.clear();
     _markers.clear();
+    _price = 0.0;
+    _co2 = 0.0;
+    _totalDistance = 0.0;
+    _totalDuration = Duration.zero;
 
     // Ruta desde el origen hasta la primera estación
     final rutaOrigenEstacion = await _getRouteCoordinates(widget.originPosition, LatLng(estacionOrigen.latitud, estacionOrigen.longitud));
@@ -332,6 +344,9 @@ class _RouteViewTelefericoState extends State<RouteViewTeleferico> {
           LatLng(estacionSiguiente.latitud, estacionSiguiente.longitud),
         ],
       ));
+
+      // Calcular precio y CO2 para cada tramo
+      await _calcularPrecioYCO2(lineaActual.id == lineaSiguiente.id, estacionActual, estacionSiguiente);
     }
 
     // Añadir el último marcador para la estación final
@@ -385,22 +400,125 @@ class _RouteViewTelefericoState extends State<RouteViewTeleferico> {
     setState(() {});
   }
 
+  Future<void> _calcularPrecioYCO2(bool esMismaLinea, Estacion estacionActual, Estacion estacionSiguiente) async {
+    try {
+      DocumentSnapshot snapshot = await FirebaseFirestore.instance.collection('constantes').doc('CuhQJiL6y9MwPt1R70kc').get();
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>;
+        final tarifaGeneral = data['TarifaGeneral'];
+        final tarifaPreferencial = data['TarifaPreferencial'];
+        final consumoMedio = _getDouble(data['consumo_medio']);
+        final tipoCombustible = data['tipo_combustible'] as String;
+        final capacidadPromedio = _getDouble(data['capacidad_promedio']).toInt();
+
+        final distancia = _distanciaEntreEstaciones(estacionActual.nombreEstacion, estacionSiguiente.nombreEstacion) / 1000; // Convertir a kilómetros
+        final tarifa = esMismaLinea ? tarifaGeneral['PrimeraLinea'] : tarifaGeneral['Transbordo'];
+        
+        setState(() {
+          _price += tarifa;
+          _co2 += _calculateCO2Emission(consumoMedio, tipoCombustible, distancia) / capacidadPromedio; // Emisiones por pasajero
+        });
+      }
+    } catch (e) {
+      print('Error al calcular precio y CO2: $e');
+    }
+  }
+
+  double _getDouble(dynamic value) {
+    if (value is int) {
+      return value.toDouble();
+    } else if (value is double) {
+      return value;
+    } else {
+      throw ArgumentError('El valor no es ni int ni double');
+    }
+  }
+
+  double _calculateCO2Emission(double fuelConsumption, String fuelType, double distance) {
+    const fuelEmissionFactors = {
+      'gasolina': 2.31,
+      'diesel': 2.68,
+      'electricidad': 0.47
+    };
+    return fuelConsumption * fuelEmissionFactors[fuelType]! * distance;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Ruta de Teleférico'),
       ),
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(
-          target: LatLng(-16.4897, -68.1193),
-          zoom: 14.5,
-        ),
-        onMapCreated: (controller) {
-          _googleMapController = controller;
-        },
-        markers: _markers,
-        polylines: _polylines,
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: LatLng(-16.4897, -68.1193),
+              zoom: 14.5,
+            ),
+            onMapCreated: (controller) {
+              _googleMapController = controller;
+            },
+            markers: _markers,
+            polylines: _polylines,
+          ),
+          if (_totalDistance > 0 && _totalDuration != Duration.zero)
+            Positioned(
+              bottom: 50,
+              left: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 6.0,
+                  horizontal: 12.0,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20.0),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      offset: Offset(0, 2),
+                      blurRadius: 6.0,
+                    )
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Ruta',
+                      style: const TextStyle(
+                        fontSize: 20.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Distancia: ${_totalDistance.toStringAsFixed(2)} km, Tiempo: ${_totalDuration.inMinutes} min',
+                      style: const TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Precio: \$${_price.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'CO₂: ${_co2.toStringAsFixed(2)} kg',
+                      style: const TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
