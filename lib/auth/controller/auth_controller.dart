@@ -38,6 +38,7 @@ class AuthController extends StateNotifier<bool> {
   ValueChanged<String?>? onEmailVerification;
   final AuthAPI _authAPI;
   final UserAPI _userAPI;
+
   AuthController({
     required AuthAPI authAPI,
     required UserAPI userAPI,
@@ -52,6 +53,9 @@ class AuthController extends StateNotifier<bool> {
     required String password,
     required String name,
     required String phoneNumber,
+    required String birthDate,
+    required bool pumaKatari,
+    required bool teleferico,
     required BuildContext context,
   }) async {
     state = true;
@@ -67,17 +71,15 @@ class AuthController extends StateNotifier<bool> {
           email: email,
           name: name,
           phoneNumber: phoneNumber,
-          followers: const [],
-          following: const [],
-          profilePic: '',
-          bannerPic: '',
-          uid: r!.uid,
-          bio: '',
-          isTwitterBlue: false,
+          birthDate: birthDate,
+          pumaKatari: pumaKatari,
+          teleferico: teleferico,
+          password: password,
+          uid: r!.uid, profilePic: '', role: 'client',
         );
         final res2 = await _userAPI.saveUserData(userModel);
         res2.fold((l) => showSnackBar(context, l.message), (r) {
-          showSnackBar(context, 'Accounted created! Please login.');
+          showSnackBar(context, 'Account created! Please login.');
           Navigator.push(context, LoginView.route());
         });
       },

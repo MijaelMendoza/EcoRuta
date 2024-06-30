@@ -17,8 +17,6 @@ abstract class IUserAPI {
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> searchUserByName(String name);
   FutureEitherVoid updateUserData(UserModel userModel);
   Stream<QuerySnapshot<Map<String, dynamic>>> getLatestUserProfileData();
-  FutureEitherVoid followUser(UserModel user);
-  FutureEitherVoid addToFollowing(UserModel user);
 }
 
 class UserAPI implements IUserAPI {
@@ -31,7 +29,7 @@ class UserAPI implements IUserAPI {
   FutureEitherVoid saveUserData(UserModel userModel) async {
     try {
       await _firestore.collection('users').doc(userModel.uid).set(
-        userModel.toMap(),
+        userModel.toJson(),
       );
       return right(null);
     } catch (e, st) {
@@ -39,20 +37,16 @@ class UserAPI implements IUserAPI {
     }
   }
 
- @override
-Future<DocumentSnapshot<Map<String, dynamic>>> getUserData(String uid) {
-  return _firestore.collection('users').doc(uid).get();
-}
+  @override
+  Future<DocumentSnapshot<Map<String, dynamic>>> getUserData(String uid) {
+    return _firestore.collection('users').doc(uid).get();
+  }
 
   @override
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> searchUserByName(String name) async {
-    //final querySnapshot = await _firestore
-       // .collection('users')
-       /// .where('name', isEqualTo: name)
-       // .get();
- final  querySnapshot = await _firestore.collection('users')
-      //.where('name', isGreaterThanOrEqualTo: name)
-      .where('name', isLessThan: name +'z' ) // Ajusta para obtener un rango más amplio
+    final querySnapshot = await _firestore.collection('users')
+      .where('name', isGreaterThanOrEqualTo: name)
+      .where('name', isLessThanOrEqualTo: name + 'z')
       .get();
     return querySnapshot.docs;
   }
@@ -61,7 +55,7 @@ Future<DocumentSnapshot<Map<String, dynamic>>> getUserData(String uid) {
   FutureEitherVoid updateUserData(UserModel userModel) async {
     try {
       await _firestore.collection('users').doc(userModel.uid).update(
-        userModel.toMap(),
+        userModel.toJson(),
       );
       return right(null);
     } catch (e, st) {
@@ -74,27 +68,4 @@ Future<DocumentSnapshot<Map<String, dynamic>>> getUserData(String uid) {
     return _firestore.collection('users').snapshots();
   }
 
-  @override
-  FutureEitherVoid followUser(UserModel user) async {
-    try {
-      await _firestore.collection('users').doc(user.uid).update(
-        {'followers': user.followers},
-      );
-      return right(null);
-    } catch (e, st) {
-      return left(Failure(e.toString(), st));
-    }
-  }
-
-  @override
-  FutureEitherVoid addToFollowing(UserModel user) async {
-    try {
-      await _firestore.collection('users').doc(user.uid).update(
-        {'following': user.following},
-      );
-      return right(null);
-    } catch (e, st) {
-      return left(Failure(e.toString(), st));
-    }
-  }
 }

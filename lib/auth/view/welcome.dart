@@ -57,8 +57,10 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = _themeMode == ThemeMode.dark;
+
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
 
     return MaterialApp(
@@ -80,7 +82,7 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
                     const Column(
                       children: <Widget>[
                         Text(
-                          "Bienvenido a EcoRuta",
+                          "Bienvenido a AYI",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 30,
@@ -98,7 +100,7 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
                     Column(
                       children: <Widget>[
                         Text(
-                          "Explora tus alrededores con Ecoruta",
+                          "Explora tus alrededores con AYI",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.grey[700],
@@ -115,19 +117,23 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
                           height: 60,
                           onPressed: () {
                             Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const SignUpView()));
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SignUpView(),
+                              ),
+                            );
                           },
-                          color: Color.fromARGB(255, 198, 12, 12),
+                          color: const Color.fromRGBO(0, 121, 107, 1),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(50)),
+                            borderRadius: BorderRadius.circular(50),
+                          ),
                           child: const Text(
                             "Registrarse con correo electrónico",
                             style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 18),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -136,23 +142,26 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
                           height: 60,
                           onPressed: () {
                             Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => HomeView(
-                                          toggleTheme: _toggleTheme,
-                                          isDarkMode:
-                                              _themeMode == ThemeMode.dark,
-                                        )));
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => HomeView(
+                                  toggleTheme: _toggleTheme,
+                                  isDarkMode: isDarkMode,
+                                ),
+                              ),
+                            );
                           },
                           color: Colors.grey,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(50)),
+                            borderRadius: BorderRadius.circular(50),
+                          ),
                           child: const Text(
                             "Continuar sin iniciar sesión",
                             style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 18),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18,
+                            ),
                           ),
                         ),
                       ],
@@ -160,14 +169,15 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
                     RichText(
                       text: TextSpan(
                         text: "¿Ya tienes una cuenta? ",
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
+                          color: isDarkMode ? Colors.white : Colors.black,
                         ),
                         children: [
                           TextSpan(
                             text: 'Iniciar sesión',
                             style: const TextStyle(
-                              color: Color.fromARGB(255, 198, 12, 12),
+                              color: Color.fromRGBO(0, 121, 107, 1),
                               fontSize: 16,
                             ),
                             recognizer: TapGestureRecognizer()
@@ -188,7 +198,7 @@ class _WelcomePageState extends ConsumerState<WelcomePage> {
                 top: 10,
                 right: 10,
                 child: IconButton(
-                  icon: Icon(Icons.brightness_6),
+                  icon: const Icon(Icons.brightness_6),
                   onPressed: _toggleTheme,
                 ),
               ),

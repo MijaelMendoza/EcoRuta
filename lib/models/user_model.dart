@@ -1,56 +1,58 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 @immutable
 class UserModel {
   final String email;
   final String name;
   final String phoneNumber;
-  final List<String> followers;
-  final List<String> following;
-  final String profilePic;
-  final String bannerPic;
+  final String birthDate;
+  final bool pumaKatari;
+  final bool teleferico;
+  final String password;
   final String uid;
-  final String bio;
-  final bool isTwitterBlue;
+  final String profilePic;
+  final String role;  // Agregado el campo role
+
   const UserModel({
     required this.email,
     required this.name,
     required this.phoneNumber,
-    required this.followers,
-    required this.following,
-    required this.profilePic,
-    required this.bannerPic,
+    required this.birthDate,
+    required this.pumaKatari,
+    required this.teleferico,
+    required this.password,
     required this.uid,
-    required this.bio,
-    required this.isTwitterBlue,
+    required this.profilePic,
+    required this.role,  // Inicializar el campo role
   });
 
   UserModel copyWith({
     String? email,
     String? name,
     String? phoneNumber,
-    List<String>? followers,
-    List<String>? following,
-    String? profilePic,
-    String? bannerPic,
+    String? birthDate,
+    bool? pumaKatari,
+    bool? teleferico,
+    String? password,
     String? uid,
-    String? bio,
-    bool? isTwitterBlue,
+    String? profilePic,
+    String? role,  // Agregar role a copyWith
   }) {
     return UserModel(
       email: email ?? this.email,
       name: name ?? this.name,
       phoneNumber: phoneNumber ?? this.phoneNumber,
-      followers: followers ?? this.followers,
-      following: following ?? this.following,
-      profilePic: profilePic ?? this.profilePic,
-      bannerPic: bannerPic ?? this.bannerPic,
+      birthDate: birthDate ?? this.birthDate,
+      pumaKatari: pumaKatari ?? this.pumaKatari,
+      teleferico: teleferico ?? this.teleferico,
+      password: password ?? this.password,
       uid: uid ?? this.uid,
-      bio: bio ?? this.bio,
-      isTwitterBlue: isTwitterBlue ?? this.isTwitterBlue,
+      profilePic: profilePic ?? this.profilePic,
+      role: role ?? this.role,  // Copiar el campo role
     );
   }
- // Método para crear un objeto User a partir de un DocumentSnapshot
+
   static UserModel fromSnap(DocumentSnapshot snap) {
     var snapshot = snap.data() as Map<String, dynamic>;
 
@@ -58,93 +60,41 @@ class UserModel {
       email: snapshot["email"],
       name: snapshot["name"],
       phoneNumber: snapshot["phoneNumber"],
-      followers: List<String>.from(snapshot["followers"] ?? []),
-      following: List<String>.from(snapshot["following"] ?? []),
-      profilePic: snapshot["profilePic"],
-      bannerPic: snapshot["bannerPic"],
+      birthDate: snapshot["birthDate"],
+      pumaKatari: snapshot["pumaKatari"],
+      teleferico: snapshot["teleferico"],
+      password: snapshot["password"],
       uid: snapshot["uid"],
-      bio: snapshot["bio"],
-      isTwitterBlue: snapshot["isTwitterBlue"] ?? false,
+      profilePic: snapshot["profilePic"],
+      role: snapshot["role"],  // Asignar el campo role
     );
   }
 
-  // Método para convertir el objeto User a un mapa (para ser almacenado en Firestore, por ejemplo)
+  factory UserModel.fromMap(Map<String, dynamic> map, {required String documentId}) {
+    return UserModel(
+      email: map['email'] ?? '',
+      name: map['name'] ?? '',
+      phoneNumber: map['phoneNumber'] ?? '',
+      birthDate: map['birthDate'] ?? '',
+      pumaKatari: map['pumaKatari'] ?? false,
+      teleferico: map['teleferico'] ?? false,
+      password: map['password'] ?? '',
+      uid: documentId,
+      profilePic: map['profilePic'] ?? '',
+      role: map['role'] ?? '',  // Asignar el campo role
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         "email": email,
         "name": name,
         "phoneNumber": phoneNumber,
-        "followers": followers,
-        "following": following,
-        "profilePic": profilePic,
-        "bannerPic": bannerPic,
+        "birthDate": birthDate,
+        "pumaKatari": pumaKatari,
+        "teleferico": teleferico,
+        "password": password,
         "uid": uid,
-        "bio": bio,
-        "isTwitterBlue": isTwitterBlue,
+        "profilePic": profilePic,
+        "role": role,  // Incluir el campo role en el JSON
       };
-  Map<String, dynamic> toMap() {
-    final result = <String, dynamic>{};
-
-    result.addAll({'email': email});
-    result.addAll({'name': name});
-    result.addAll({'phoneNumber': phoneNumber});
-    result.addAll({'followers': followers});
-    result.addAll({'following': following});
-    result.addAll({'profilePic': profilePic});
-    result.addAll({'bannerPic': bannerPic});
-    result.addAll({'bio': bio});
-    result.addAll({'isTwitterBlue': isTwitterBlue});
-
-    return result;
-  }
-
-  factory UserModel.fromMap(Map<String, dynamic> map, {required String documentId}) {
-  return UserModel(
-    email: map['email'] ?? '',
-    name: map['name'] ?? '',
-    phoneNumber: map['phoneNumber'] ?? '',
-    followers: List<String>.from(map['followers']),
-    following: List<String>.from(map['following']),
-    profilePic: map['profilePic'] ?? '',
-    bannerPic: map['bannerPic'] ?? '',
-    uid: documentId ?? '', 
-    bio: map['bio'] ?? '',
-    isTwitterBlue: map['isTwitterBlue'] ?? false,
-  );
-}
-
-  @override
-  String toString() {
-    return 'UserModel(email: $email, name: $name, phoneNumber: $phoneNumber, followers: $followers, following: $following, profilePic: $profilePic, bannerPic: $bannerPic, uid: $uid, bio: $bio, isTwitterBlue: $isTwitterBlue)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    return other is UserModel &&
-        other.email == email &&
-        other.name == name &&
-        other.phoneNumber == phoneNumber &&
-        listEquals(other.followers, followers) &&
-        listEquals(other.following, following) &&
-        other.profilePic == profilePic &&
-        other.bannerPic == bannerPic &&
-        other.uid == uid &&
-        other.bio == bio &&
-        other.isTwitterBlue == isTwitterBlue;
-  }
-
-  @override
-  int get hashCode {
-    return email.hashCode ^
-        name.hashCode ^
-        phoneNumber.hashCode ^
-        followers.hashCode ^
-        following.hashCode ^
-        profilePic.hashCode ^
-        bannerPic.hashCode ^
-        uid.hashCode ^
-        bio.hashCode ^
-        isTwitterBlue.hashCode;
-  }
 }

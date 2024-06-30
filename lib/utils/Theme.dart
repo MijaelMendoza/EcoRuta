@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+
 class Pallete {
   static const Color blueColor = Color(0xFF1E88E5);
   static const Color greyColor = Color(0xFFBDBDBD);
@@ -12,7 +13,7 @@ final lightTheme = ThemeData(
   primaryColor: Colors.lightBlue[200],
   brightness: Brightness.light,
   appBarTheme: AppBarTheme(
-    color: Colors.lightBlue[200],
+    color: Colors.lightBlue[100],
     iconTheme: IconThemeData(color: Colors.black),
   ),
   bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -44,7 +45,7 @@ final lightTheme = ThemeData(
 final darkTheme = ThemeData(
   brightness: Brightness.dark,
   primarySwatch: Colors.blue,
-  primaryColor: Colors.blueGrey[900],
+  primaryColor: Colors.teal[700],
   appBarTheme: AppBarTheme(
     color: Colors.black,
     iconTheme: IconThemeData(color: Colors.white),

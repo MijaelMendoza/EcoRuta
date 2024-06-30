@@ -379,15 +379,31 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
                   SizedBox(height: 10),
                   Text('Seleccionar Color de la Línea', style: TextStyle(fontSize: 16)),
                   SizedBox(height: 10),
-                  ColorPicker(
-                    pickerColor: _selectedColor,
-                    onColorChanged: (color) {
-                      setState(() {
-                        _selectedColor = color;
-                      });
-                    },
-                    showLabel: true,
-                    pickerAreaHeightPercent: 0.8,
+                  Wrap(
+                    spacing: 10.0,
+                    runSpacing: 10.0,
+                    children: [
+                      _buildColorOption(Colors.red, 'Rojo'),
+                      _buildColorOption(Colors.green, 'Verde'),
+                      _buildColorOption(Colors.blue, 'Azul'),
+                      _buildColorOption(Colors.yellow, 'Amarillo'),
+                      _buildColorOption(Colors.purple, 'Morado'),
+                      _buildColorOption(Colors.orange, 'Naranja'),
+                      _buildColorOption(Colors.pink, 'Rosa'),
+                      GestureDetector(
+                        onTap: () => _selectCustomColor(),
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey[200],
+                            border: Border.all(color: Colors.black),
+                          ),
+                          child: Icon(Icons.add, color: Colors.black),
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: 20),
                   ElevatedButton(
@@ -406,6 +422,66 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildColorOption(Color color, String name) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedColor = color;
+        });
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color,
+          border: Border.all(color: _selectedColor == color ? Colors.black : Colors.transparent, width: 2),
+        ),
+      ),
+    );
+  }
+
+  void _selectCustomColor() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+          title: Text('Seleccionar Color Personalizado'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ColorPicker(
+                pickerColor: _selectedColor,
+                onColorChanged: (color) {
+                  setState(() {
+                    _selectedColor = color;
+                  });
+                },
+                showLabel: true,
+                pickerAreaHeightPercent: 0.8,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Seleccionar'),
+            ),
+          ],
         );
       },
     );
@@ -468,15 +544,31 @@ class _RegistroLineaScreenState extends State<RegistroLineaScreen> {
             SizedBox(height: 10),
             Text('Seleccionar Color de la Línea', style: TextStyle(fontSize: 16)),
             SizedBox(height: 10),
-            ColorPicker(
-              pickerColor: _selectedColor,
-              onColorChanged: (color) {
-                setState(() {
-                  _selectedColor = color;
-                });
-              },
-              showLabel: true,
-              pickerAreaHeightPercent: 0.8,
+            Wrap(
+              spacing: 10.0,
+              runSpacing: 10.0,
+              children: [
+                _buildColorOption(Colors.red, 'Rojo'),
+                _buildColorOption(Colors.green, 'Verde'),
+                _buildColorOption(Colors.blue, 'Azul'),
+                _buildColorOption(Colors.yellow, 'Amarillo'),
+                _buildColorOption(Colors.purple, 'Morado'),
+                _buildColorOption(Colors.orange, 'Naranja'),
+                _buildColorOption(Colors.pink, 'Rosa'),
+                GestureDetector(
+                  onTap: () => _selectCustomColor(),
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey[200],
+                      border: Border.all(color: Colors.black),
+                    ),
+                    child: Icon(Icons.add, color: Colors.black),
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 20),
             ElevatedButton(

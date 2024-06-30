@@ -6,12 +6,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_gmaps/utils/theme.dart';
-import 'package:flutter_gmaps/utils/menu_drawer.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_place/google_place.dart';
 import 'dart:convert';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_gmaps/user_profile/view/user_profile_view.dart';
 
-class HomeView extends StatefulWidget {
+class HomeView extends ConsumerStatefulWidget {
   final VoidCallback toggleTheme;
   final bool isDarkMode;
 
@@ -28,7 +29,7 @@ class HomeView extends StatefulWidget {
   _HomeViewState createState() => _HomeViewState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _HomeViewState extends ConsumerState<HomeView> {
   static const _initialCameraPosition = CameraPosition(
     target: LatLng(-16.4897, -68.1193),
     zoom: 14.5,
@@ -48,6 +49,8 @@ class _HomeViewState extends State<HomeView> {
   List<AutocompletePrediction> _originPredictions = [];
   List<AutocompletePrediction> _destinationPredictions = [];
   final GooglePlace googlePlace = GooglePlace(googleAPIKey);
+  bool _isLoading = false; // Variable para el loader
+  Marker? _destinationMarker; // Variable para el marcador
 
   @override
   void initState() {
@@ -119,11 +122,13 @@ class _HomeViewState extends State<HomeView> {
   }
 
   Future<String> _getAddressFromLatLng(LatLng position) async {
-    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$googleAPIKey';
+    final url =
+        'https://maps.googleapis.com/maps/api/geocode/json?latlng=${position.latitude},${position.longitude}&key=$googleAPIKey';
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       final jsonResponse = json.decode(response.body);
-      if (jsonResponse['results'] != null && jsonResponse['results'].length > 0) {
+      if (jsonResponse['results'] != null &&
+          jsonResponse['results'].length > 0) {
         return jsonResponse['results'][0]['formatted_address'];
       }
     }
@@ -155,7 +160,24 @@ class _HomeViewState extends State<HomeView> {
     });
   }
 
-  void _showOriginDestinationBottomSheet() {
+  void _showOriginDestinationBottomSheet(LatLng destinationPosition) async {
+    setState(() {
+      _isLoading = true; // Mostrar loader
+      _destinationMarker = Marker(
+        markerId: MarkerId('destination'),
+        position: destinationPosition,
+      ); // Agregar marcador
+    });
+
+    final address = await _getAddressFromLatLng(destinationPosition);
+
+    setState(() {
+      _isLoading = false; // Ocultar loader
+      _destinationPosition = destinationPosition;
+      _destinationAddress = address;
+      _destinationController.text = _destinationAddress;
+    });
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -163,7 +185,8 @@ class _HomeViewState extends State<HomeView> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
             return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -231,10 +254,14 @@ class _HomeViewState extends State<HomeView> {
                                       ),
                                       onChanged: (value) async {
                                         if (value.isNotEmpty) {
-                                          var result = await googlePlace.autocomplete.get(value);
-                                          if (result != null && result.predictions != null) {
+                                          var result = await googlePlace
+                                              .autocomplete
+                                              .get(value);
+                                          if (result != null &&
+                                              result.predictions != null) {
                                             setState(() {
-                                              _originPredictions = result.predictions!;
+                                              _originPredictions =
+                                                  result.predictions!;
                                             });
                                           }
                                         } else {
@@ -248,19 +275,40 @@ class _HomeViewState extends State<HomeView> {
                                         ? Container(
                                             height: 100,
                                             child: ListView.builder(
-                                              itemCount: _originPredictions.length,
+                                              itemCount:
+                                                  _originPredictions.length,
                                               itemBuilder: (context, index) {
                                                 return ListTile(
-                                                  title: Text(_originPredictions[index].description ?? ''),
+                                                  title: Text(
+                                                      _originPredictions[index]
+                                                              .description ??
+                                                          ''),
                                                   onTap: () async {
-                                                    final placeId = _originPredictions[index].placeId!;
-                                                    final details = await googlePlace.details.get(placeId);
-                                                    if (details != null && details.result != null) {
-                                                      final location = details.result!.geometry!.location!;
+                                                    final placeId =
+                                                        _originPredictions[
+                                                                index]
+                                                            .placeId!;
+                                                    final details =
+                                                        await googlePlace
+                                                            .details
+                                                            .get(placeId);
+                                                    if (details != null &&
+                                                        details.result !=
+                                                            null) {
+                                                      final location = details
+                                                          .result!
+                                                          .geometry!
+                                                          .location!;
                                                       setState(() {
-                                                        _originPosition = LatLng(location.lat!, location.lng!);
-                                                        _originAddress = details.result!.formattedAddress!;
-                                                        _originController.text = _originAddress;
+                                                        _originPosition =
+                                                            LatLng(
+                                                                location.lat!,
+                                                                location.lng!);
+                                                        _originAddress = details
+                                                            .result!
+                                                            .formattedAddress!;
+                                                        _originController.text =
+                                                            _originAddress;
                                                         _originPredictions = [];
                                                       });
                                                     }
@@ -278,7 +326,8 @@ class _HomeViewState extends State<HomeView> {
                                 onPressed: () async {
                                   LatLng? result = await _selectLocationOnMap();
                                   if (result != null) {
-                                    final address = await _getAddressFromLatLng(result);
+                                    final address =
+                                        await _getAddressFromLatLng(result);
                                     setState(() {
                                       _originPosition = result;
                                       _originAddress = address;
@@ -304,10 +353,14 @@ class _HomeViewState extends State<HomeView> {
                                       ),
                                       onChanged: (value) async {
                                         if (value.isNotEmpty) {
-                                          var result = await googlePlace.autocomplete.get(value);
-                                          if (result != null && result.predictions != null) {
+                                          var result = await googlePlace
+                                              .autocomplete
+                                              .get(value);
+                                          if (result != null &&
+                                              result.predictions != null) {
                                             setState(() {
-                                              _destinationPredictions = result.predictions!;
+                                              _destinationPredictions =
+                                                  result.predictions!;
                                             });
                                           }
                                         } else {
@@ -321,20 +374,44 @@ class _HomeViewState extends State<HomeView> {
                                         ? Container(
                                             height: 100,
                                             child: ListView.builder(
-                                              itemCount: _destinationPredictions.length,
+                                              itemCount: _destinationPredictions
+                                                  .length,
                                               itemBuilder: (context, index) {
                                                 return ListTile(
-                                                  title: Text(_destinationPredictions[index].description ?? ''),
+                                                  title: Text(
+                                                      _destinationPredictions[
+                                                                  index]
+                                                              .description ??
+                                                          ''),
                                                   onTap: () async {
-                                                    final placeId = _destinationPredictions[index].placeId!;
-                                                    final details = await googlePlace.details.get(placeId);
-                                                    if (details != null && details.result != null) {
-                                                      final location = details.result!.geometry!.location!;
+                                                    final placeId =
+                                                        _destinationPredictions[
+                                                                index]
+                                                            .placeId!;
+                                                    final details =
+                                                        await googlePlace
+                                                            .details
+                                                            .get(placeId);
+                                                    if (details != null &&
+                                                        details.result !=
+                                                            null) {
+                                                      final location = details
+                                                          .result!
+                                                          .geometry!
+                                                          .location!;
                                                       setState(() {
-                                                        _destinationPosition = LatLng(location.lat!, location.lng!);
-                                                        _destinationAddress = details.result!.formattedAddress!;
-                                                        _destinationController.text = _destinationAddress;
-                                                        _destinationPredictions = [];
+                                                        _destinationPosition =
+                                                            LatLng(
+                                                                location.lat!,
+                                                                location.lng!);
+                                                        _destinationAddress =
+                                                            details.result!
+                                                                .formattedAddress!;
+                                                        _destinationController
+                                                                .text =
+                                                            _destinationAddress;
+                                                        _destinationPredictions =
+                                                            [];
                                                       });
                                                     }
                                                   },
@@ -351,11 +428,13 @@ class _HomeViewState extends State<HomeView> {
                                 onPressed: () async {
                                   LatLng? result = await _selectLocationOnMap();
                                   if (result != null) {
-                                    final address = await _getAddressFromLatLng(result);
+                                    final address =
+                                        await _getAddressFromLatLng(result);
                                     setState(() {
                                       _destinationPosition = result;
                                       _destinationAddress = address;
-                                      _destinationController.text = _destinationAddress;
+                                      _destinationController.text =
+                                          _destinationAddress;
                                     });
                                   }
                                 },
@@ -366,7 +445,8 @@ class _HomeViewState extends State<HomeView> {
                           ElevatedButton(
                             onPressed: () {
                               Navigator.pop(context);
-                              if (_selectedIndex == 2) { // Teleferico
+                              if (_selectedIndex == 2) {
+                                // Teleferico
                                 _irARouteView();
                               }
                             },
@@ -378,7 +458,8 @@ class _HomeViewState extends State<HomeView> {
                               Navigator.pop(context);
                             },
                             child: Text('Cerrar'),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red),
                           ),
                         ],
                       ),
@@ -457,8 +538,24 @@ class _HomeViewState extends State<HomeView> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        centerTitle: false,
-        title: const Text('EcoRuta'),
+        centerTitle: true,
+        title: Image.asset(
+          'assets/pngs/Logo Menta_Mesa de trabajo 1.png',
+          height: 70,
+        ),
+        leading: IconButton(
+          icon: Icon(
+            Icons.account_circle,
+            color: _isDarkMode ? Colors.white : Colors.black,
+          ),
+          onPressed: () {
+            // Navigate to user profile view
+            Navigator.push(
+              context,
+              UserProfileView.route(),
+            );
+          },
+        ),
         actions: [
           IconButton(
             icon: Icon(
@@ -467,18 +564,14 @@ class _HomeViewState extends State<HomeView> {
             ),
             onPressed: _toggleTheme,
           ),
+          IconButton(
+            icon: Icon(
+              Icons.notifications,
+              color: _isDarkMode ? Colors.white : Colors.black,
+            ),
+            onPressed: () {},
+          ),
         ],
-        leading: Builder(
-          builder: (context) {
-            return IconButton(
-              icon: Icon(
-                Icons.menu,
-                color: _isDarkMode ? Colors.white : Colors.black,
-              ),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            );
-          },
-        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             bottom: Radius.circular(30),
@@ -491,7 +584,6 @@ class _HomeViewState extends State<HomeView> {
             ? Colors.white
             : Theme.of(context).appBarTheme.iconTheme?.color,
       ),
-      drawer: MenuDrawer(),
       body: Stack(
         children: [
           GoogleMap(
@@ -503,13 +595,25 @@ class _HomeViewState extends State<HomeView> {
               _googleMapController = controller;
               _updateMapStyle();
             },
+            onTap: (LatLng position) {
+              _showOriginDestinationBottomSheet(position);
+            },
+            markers: _destinationMarker != null
+                ? {
+                    _destinationMarker!,
+                  }
+                : {},
           ),
+          if (_isLoading)
+            Center(
+              child: CircularProgressIndicator(),
+            ),
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: GestureDetector(
-              onTap: _showOriginDestinationBottomSheet,
+              onTap: () => _showOriginDestinationBottomSheet(_currentPosition),
               child: Container(
                 decoration: BoxDecoration(
                   color: _isDarkMode
@@ -568,7 +672,7 @@ class _HomeViewState extends State<HomeView> {
                       setState(() {
                         _selectedIndex = index;
                       });
-                      _showOriginDestinationBottomSheet();
+                      _showOriginDestinationBottomSheet(_currentPosition);
                     },
                     backgroundColor: Colors.transparent,
                     elevation: 0,

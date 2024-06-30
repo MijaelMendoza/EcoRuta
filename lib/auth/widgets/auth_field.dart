@@ -7,7 +7,7 @@ class AuthField extends StatelessWidget {
   const AuthField({
     super.key,
     required this.controller,
-    required this.hintText,
+    required this.hintText, required bool obscureText,
   });
 
   @override

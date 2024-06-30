@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/Views/MiTeleferico/Registro/ListLineasTeleferico.dart';
 import 'package:flutter_gmaps/Views/lineas/lineas_registered_view.dart';
+import 'package:flutter_gmaps/auth/controller/auth_controller.dart';
+import 'package:flutter_gmaps/auth/view/login_view.dart';
 import 'package:flutter_gmaps/auth/view/welcome.dart';
+import 'package:flutter_gmaps/user_profile/view/user_profile_view.dart'; // Importar la vista del perfil del usuario
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MenuDrawer extends StatelessWidget {
+class MenuDrawer extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsyncValue = ref.watch(currentUserAccountProvider);
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -14,12 +20,29 @@ class MenuDrawer extends StatelessWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).primaryColor,
             ),
-            child: Text(
-              'Menu',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
+            child: userAsyncValue.when(
+              data: (user) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Menú',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    user != null ? 'Bienvenido, ${user.email}' : 'Bienvenido',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
               ),
+              loading: () => CircularProgressIndicator(),
+              error: (err, stack) => Text('Error: $err'),
             ),
           ),
           ListTile(
@@ -55,23 +78,51 @@ class MenuDrawer extends StatelessWidget {
           ),
           ListTile(
             leading: Icon(Icons.directions_bus),
-            title: Text('Líneas de Teleferico'),
+            title: Text('Líneas de Teleférico'),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => ListLineasTelefericoScreen()),
-              ); // Navigate to LineasScreen
+              ); // Navigate to ListLineasTelefericoScreen
             },
-          ),
-          ListTile(
-            leading: Icon(Icons.login),
-            title: Text('Login'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => WelcomePage()),
-              ); // Navigate to WelcomePage
+          ), 
+          userAsyncValue.when(
+            data: (user) {
+              return user != null
+                  ? Column(
+                      children: [
+                        ListTile(
+                          leading: Icon(Icons.person),
+                          title: Text('Perfil'),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              UserProfileView.route(),
+                            );
+                          },
+                        ),
+                        ListTile(
+                          leading: Icon(Icons.logout),
+                          title: Text('Cerrar Sesión'),
+                          onTap: () {
+                            ref.read(authControllerProvider.notifier).logout(context);
+                          },
+                        ),
+                      ],
+                    )
+                  : ListTile(
+                      leading: Icon(Icons.login),
+                      title: Text('Iniciar Sesión'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => LoginView()),
+                        ); // Navigate to LoginView
+                      },
+                    );
             },
+            loading: () => Container(),
+            error: (err, stack) => Container(),
           ),
         ],
       ),

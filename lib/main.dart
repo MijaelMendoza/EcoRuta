@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/Views/home_view.dart';
 import 'package:flutter_gmaps/auth/view/welcome.dart';
@@ -22,6 +23,24 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  late StreamSubscription<User?> _authSubscription;
+  User? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      setState(() {
+        _user = user;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription.cancel();
+    super.dispose();
+  }
 
   void _toggleTheme() {
     setState(() {
@@ -32,16 +51,14 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'EcoRuta',
+      title: 'AYI',
       debugShowCheckedModeBanner: false,
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: _themeMode,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => WelcomePage(),
-        '/home': (context) => HomeView(toggleTheme: _toggleTheme, isDarkMode: _themeMode == ThemeMode.dark),
-      },
+      home: _user == null
+          ? WelcomePage()
+          : HomeView(toggleTheme: _toggleTheme, isDarkMode: _themeMode == ThemeMode.dark),
     );
   }
 }
