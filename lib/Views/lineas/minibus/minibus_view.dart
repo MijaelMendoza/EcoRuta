@@ -1,14 +1,15 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/.env.dart';
 import 'package:flutter_gmaps/Controllers/MiLinea/lineas_controller.dart';
 import 'package:flutter_gmaps/core/directions_repository.dart';
+import 'package:flutter_gmaps/models/MiLinea/lineas_model.dart';
 import 'package:flutter_gmaps/models/directions/directions_model.dart';
 import 'package:flutter_google_places/flutter_google_places.dart';
-
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_webservice/places.dart';
 
@@ -29,15 +30,52 @@ class _RouteMinibusScreenState extends ConsumerState<RouteMinibusScreen> {
   Directions? _info;
   final TextEditingController _destinationController = TextEditingController();
   Set<Polyline> _polylines = {};
+  Set<Marker> _markers = {};
   double _price = 0.0;
   double _co2 = 0.0;
   final LatLng _calle1Obrajes = LatLng(-16.5235717, -68.1177334);
   final Set<String> _processedRoutes = {};
+final Map<String, Color> transportColors = {
+  'Viaje 1': Colors.blue,
+  'Viaje 2': Colors.red,
+};
 
   @override
   void initState() {
     super.initState();
     _initializeMarkers();
+  }
+
+  Future<BitmapDescriptor> _createCustomMinibusMarkerBitmap() async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    const double size = 130.0;
+    final Paint paint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(Offset(size / 2, size / 2), size / 2, paint);
+
+    TextPainter textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.text = TextSpan(
+      text: String.fromCharCode(Icons.directions_bus.codePoint),
+      style: TextStyle(
+        fontSize: 80.0,
+        fontFamily: Icons.directions_bus.fontFamily,
+        color: Colors.white,
+      ),
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset((size - textPainter.width) / 2, (size - textPainter.height) / 2));
+
+    final picture = pictureRecorder.endRecording();
+    final img = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    final uint8List = byteData!.buffer.asUint8List();
+
+    return BitmapDescriptor.fromBytes(uint8List);
   }
 
   void _initializeMarkers() {
@@ -75,19 +113,31 @@ class _RouteMinibusScreenState extends ConsumerState<RouteMinibusScreen> {
       }).toList();
 
       if (nearbyLineas.isNotEmpty) {
-        final linea = nearbyLineas.first;
-        final puntos = linea.zonas.map((zona) => LatLng(zona.latitud, zona.longitud)).toList();
+        final optimalLinea = await _findOptimalLinea(nearbyLineas, widget.destinationPosition);
+        final puntos = optimalLinea.zonas.map((zona) => LatLng(zona.latitud, zona.longitud)).toList();
         await _addPolyline(puntos);
 
-        final directions = await DirectionsRepository().getDirections(
-          origin: origin ?? widget.originPosition,
-          destination: puntos.last,
-        );
-        setState(() {
-          _info = directions;
-          _calculatePriceAndCO2ForMinibus(puntos, directions!);
-          _checkNextBusRoute(puntos.last, widget.destinationPosition, tipo);
-        });
+        final destinoCercano = _getClosestPoint(puntos, widget.destinationPosition, 1000); // 1 km de tolerancia
+        if (destinoCercano != null) {
+          final directions = await DirectionsRepository().getDirections(
+            origin: origin ?? widget.originPosition,
+            destination: destinoCercano,
+          );
+          setState(() {
+            _info = directions;
+            _calculatePriceAndCO2ForMinibus(puntos, directions!);
+          });
+        } else {
+          final directions = await DirectionsRepository().getDirections(
+            origin: origin ?? widget.originPosition,
+            destination: puntos.last,
+          );
+          setState(() {
+            _info = directions;
+            _calculatePriceAndCO2ForMinibus(puntos, directions!);
+            _checkNextBusRoute(puntos.last, widget.destinationPosition, tipo);
+          });
+        }
       } else {
         setState(() {
           _info = null;
@@ -101,7 +151,31 @@ class _RouteMinibusScreenState extends ConsumerState<RouteMinibusScreen> {
     }
   }
 
+  Future<LineasMini> _findOptimalLinea(List<LineasMini> lineas, LatLng destination) async {
+    LineasMini? optimalLinea;
+    double minDistance = double.infinity;
+
+    for (var linea in lineas) {
+      for (var zona in linea.zonas) {
+        final distance = Geolocator.distanceBetween(
+          zona.latitud,
+          zona.longitud,
+          destination.latitude,
+          destination.longitude,
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          optimalLinea = linea;
+        }
+      }
+    }
+
+    return optimalLinea!;
+  }
+
   Future<void> _addPolyline(List<LatLng> puntos) async {
+    final busMarkerIcon = await _createCustomMinibusMarkerBitmap();
     for (int i = 0; i < puntos.length - 1; i++) {
       final directions = await DirectionsRepository().getDirections(
         origin: puntos[i],
@@ -118,6 +192,17 @@ class _RouteMinibusScreenState extends ConsumerState<RouteMinibusScreen> {
               points: directions.polylinePoints.map((e) => LatLng(e.latitude, e.longitude)).toList(),
             ),
           );
+
+          // Add bus markers
+          _markers.add(Marker(
+            markerId: MarkerId('bus_marker_${puntos[i]}'),
+            position: puntos[i],
+            icon: busMarkerIcon,
+            infoWindow: InfoWindow(
+              title: 'Parada de Minibus',
+              snippet: 'Punto ${i + 1}',
+            ),
+          ));
         });
       }
     }
@@ -186,18 +271,7 @@ class _RouteMinibusScreenState extends ConsumerState<RouteMinibusScreen> {
     }).toList();
 
     if (nearbyLineas.isNotEmpty) {
-      final optimalLinea = nearbyLineas.firstWhere(
-        (linea) => linea.zonas.any((zona) {
-          final distance = Geolocator.distanceBetween(
-            zona.latitud,
-            zona.longitud,
-            finalDestination.latitude,
-            finalDestination.longitude,
-          );
-          return distance <= 1000; // 1 km
-        }),
-        orElse: () => nearbyLineas.first,
-      );
+      final optimalLinea = await _findOptimalLinea(nearbyLineas, finalDestination);
 
       final puntos = optimalLinea.zonas.map((zona) => LatLng(zona.latitud, zona.longitud)).toList();
       await _addPolyline(puntos);
@@ -224,6 +298,26 @@ class _RouteMinibusScreenState extends ConsumerState<RouteMinibusScreen> {
         });
       }
     }
+  }
+
+  LatLng? _getClosestPoint(List<LatLng> puntos, LatLng destination, double toleranceInMeters) {
+    LatLng? closestPoint;
+    double minDistance = toleranceInMeters;
+
+    for (var punto in puntos) {
+      final distance = Geolocator.distanceBetween(
+        punto.latitude,
+        punto.longitude,
+        destination.latitude,
+        destination.longitude,
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPoint = punto;
+      }
+    }
+
+    return closestPoint;
   }
 
   bool _isBeyondCalle1Obrajes(LatLng punto) {
@@ -264,87 +358,127 @@ class _RouteMinibusScreenState extends ConsumerState<RouteMinibusScreen> {
       return 0.0;
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Iniciar Ruta en Minibus'),
-      ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: widget.originPosition,
-              zoom: 14.5,
-            ),
-            onMapCreated: (controller) {
-              _googleMapController = controller;
-            },
-            markers: {
-              if (_originMarker != null) _originMarker!,
-              if (_destinationMarker != null) _destinationMarker!,
-            },
-            polylines: _polylines,
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('Iniciar Ruta en Minibus'),
+    ),
+    body: Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: widget.originPosition,
+            zoom: 14.5,
           ),
-          if (_info != null)
-            Positioned(
-              bottom: 50,
-              left: 10,
-              right: 10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 6.0,
-                  horizontal: 12.0,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20.0),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      offset: Offset(0, 2),
-                      blurRadius: 6.0,
-                    )
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Ruta',
-                      style: const TextStyle(
-                        fontSize: 20.0,
-                        fontWeight: FontWeight.bold,
-                      ),
+          onMapCreated: (controller) {
+            _googleMapController = controller;
+          },
+          markers: _markers,
+          polylines: _polylines,
+        ),
+        if (_info != null)
+          Positioned(
+            bottom: 50,
+            left: 10,
+            right: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                vertical: 6.0,
+                horizontal: 12.0,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20.0),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    offset: Offset(0, 2),
+                    blurRadius: 6.0,
+                  )
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Ruta',
+                    style: const TextStyle(
+                      fontSize: 20.0,
+                      fontWeight: FontWeight.bold,
                     ),
-                    Text(
-                      '${_info!.totalDistance}, ${_info!.totalDuration}',
-                      style: const TextStyle(
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  Text(
+                    '${_info!.totalDistance}, ${_info!.totalDuration}',
+                    style: const TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.w600,
                     ),
-                    Text(
-                      'Precio: \$${_price.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  Text(
+                    'Precio: \$${_price.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.w600,
                     ),
-                    Text(
-                      'CO₂: ${_co2.toStringAsFixed(2)} kg',
-                      style: const TextStyle(
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  Text(
+                    'CO₂: ${_co2.toStringAsFixed(2)} kg',
+                    style: const TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.w600),
                     ),
-                  ],
-                ),
+                  
+                ],
               ),
             ),
-        ],
-      ),
-    );
-  }
+          ),
+        Positioned(
+          top: 10,
+          left: 10,
+          child: Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8.0),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 2),
+                  blurRadius: 6.0,
+                )
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: transportColors.entries.map((entry) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        color: entry.value,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        entry.key,
+                        style: TextStyle(
+                          fontSize: 16.0,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 }
