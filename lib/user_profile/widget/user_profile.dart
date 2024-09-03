@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gmaps/Views/MiTeleferico/Registro/ListLineasTeleferico.dart';
-import 'package:flutter_gmaps/Views/lineas/lineas_registered_view.dart';
+import 'package:flutter_gmaps/Views/lineas/registro/lineas_registered_view.dart';
 import 'package:flutter_gmaps/auth/controller/auth_controller.dart';
 import 'package:flutter_gmaps/common/error_page.dart';
 import 'package:flutter_gmaps/common/loading_page.dart';
